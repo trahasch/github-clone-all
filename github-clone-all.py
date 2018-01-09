@@ -12,51 +12,40 @@ import subprocess
 
 # see installation and usage instructions in README.md
 
-defaultGithubToken = "YOUR_TOKEN_HERE"
+defaultGithubToken = ["YOUR_TOKEN_HERE"]
 
 # and we're going to need the name of your GitHub "project" in which all your
 # students' work lives
 
-defaultGithubProject = "YOUR_PROJECT_HERE" # e.g., "RiceComp215"
-defaultPrefix = ""
+defaultGithubProject = ["YOUR_PROJECT_HERE"] # e.g., "RiceComp215"
+defaultPrefix = [""]
 
 # command-line argument processing
 
 parser = argparse.ArgumentParser(description='Clone a large number of GitHub repos all at once.')
 parser.add_argument('--token',
-                        nargs='?',
+                        nargs=1,
                         default=defaultGithubToken,
                         help='GitHub API token')
 parser.add_argument('--project',
-                        nargs='?',
+                        nargs=1,
                         default=defaultGithubProject,
-                        help='GitHub project to scan, default: ' + defaultGithubProject)
+                        help='GitHub project to scan, default: ' + defaultGithubProject[0])
 parser.add_argument('--prefix',
-                        nargs='?',
+                        nargs=1,
                         default=defaultPrefix,
                         help='Prefix on projects to match (default: match all projects)')
 parser.add_argument('--out',
-                        nargs='?',
-                        default=".",
+                        nargs=1,
+                        default=["."],
                         help='Destination directory for GitHub clones (default: current directory)')
 
 args = parser.parse_args()
 
-githubPrefix = args.prefix
-githubProject = args.project
-githubToken = args.token
-outDir = args.out
-
-#
-# local goodies (for my cron job)
-#
-from datetime import datetime
-from pytz import timezone  
-print ""
-print ">>>>>>>>>>>>>>"
-print ">>>>>>>>>>>>>> Running github-clone-all: " + datetime.now(timezone("US/Central")).strftime('%Y-%m-%d %H:%M:%S %Z%z')
-print ">>>>>>>>>>>>>>"
-print ""
+githubPrefix = args.prefix[0]
+githubProject = args.project[0]
+githubToken = args.token[0]
+outDir = args.out[0]
 
 requestHeaders = {
     "User-Agent": "GitHubCloneAll/1.0",
@@ -116,7 +105,7 @@ if outDir != ".":
 
 for repo in filteredRepoList:
     cloneUrl = 'https://%s@github.com/%s.git' % (githubToken, repo['full_name'])
-
+    safeCloneUrl = 'https://github.com/%s.git' % repo['full_name']
     # Steps to take, per docs above:
     #
     # mkdir foo
@@ -128,6 +117,14 @@ for repo in filteredRepoList:
     os.chdir(repo['name'])
     subprocess.call(["git", "init"])
     subprocess.call(["git", "pull", cloneUrl])
+
+    # Now, we set things up so push and pull will work, but we're *not* putting the GitHub key in place,
+    # since that makes these repos too dangerous to share. If you've got ssh keys set up with GitHub,
+    # then push and pull will still work.
+
+    subprocess.call(["git", "remote", "add", "origin", safeCloneUrl])
+    subprocess.call(["git", "fetch"])
+    subprocess.call(["git", "branch", "--set-upstream-to=origin/master", "master"])
     os.chdir('..')
 
 #
